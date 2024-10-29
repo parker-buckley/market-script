@@ -11,38 +11,20 @@ import { Play, Pause, DollarSignIcon } from 'lucide-react'
 // Sample stock tickers
 const stockTickers = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'FB', 'TSLA', 'NVDA', 'NFLX', 'VRY', 'TRBA'];
 const stockTickerValues: Record<string, number> = {};
-const stockTickerBalances: Record<string, number> = {
-  'AAPL': 0
-  , 'GOOGL': 0
-  , 'MSFT': 0
-  , 'AMZN': 0
-  , 'FB': 0
-  , 'TSLA': 0
-  , 'NVDA': 0
-  , 'NFLX': 0
-  , 'VRY': 0
-  , 'TRBA': 0
-};
-const tickerMaxValues: Record<string, number> = {
-  'AAPL': 250
-  , 'GOOGL': 400
-  , 'MSFT': 300
-  , 'AMZN': 350
-  , 'FB': 150
-  , 'TSLA': 100
-  , 'NVDA': 500
-  , 'NFLX': 300
-  , 'VRY': 300
-  , 'TRBA': 100
-};
+const stockTickerBalances: Record<string, number> = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0};
+const stockLastPurchasePrice: Record<string, number> = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0};
+const tickerMaxValues: Record<string, number> = {'AAPL': 250, 'GOOGL': 400, 'MSFT': 300, 'AMZN': 350, 'FB': 150, 'TSLA': 100, 'NVDA': 500, 'NFLX': 300, 'VRY': 300, 'TRBA': 100};
+let readOnly: boolean = false;
+
 let VOLATILITY = 10;
 const VOLATILITY_MAX = 20;
-let time = 200;
+const NUM_POINTS = 200;
+let time = NUM_POINTS;
 
 // Sample stock data generator
 const generateStockData = (
   ticker: string
-  , numPoints = 200
+  , numPoints = NUM_POINTS
 ) => {
   let price = Math.round(Math.random() * 50) + 50
   const arr = [];
@@ -70,12 +52,11 @@ export default function MarketScriptGame() {
 // Utilize the MarketScript library to interact with the market:
 
 //  getCurrentValue( tickerName: string ): number
-
-//  getHistoricalValue( tickerName: string, lookBackQuantity: number): number[]
-
+//  getHistoricalValue( tickerName: string, lookBackQuantity: number): Record<number,number>[]
 //  buyStock( tickerName: string, quantity: number ): boolean
-
 //  sellStock( tickerName: string, quantity: number ): boolean
+//  getMostRecentPurchasePrice( tickerName: string ): number
+
 console.log(MarketScript.getCurrentValue('AAPL'));\n`
   );
   const [isRunning, setIsRunning] = useState(false);
@@ -119,6 +100,7 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
             return false;
           }
 
+          stockLastPurchasePrice[ticker] = currentPrice;
           setWalletBalance( walletBalance - totalCost );
           return true;
         };
@@ -136,11 +118,24 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
           setWalletBalance( walletBalance + totalGain );
           return true;
         };
+        const getHistoricalValue = (ticker: string, lookBackQuantity: number): Record<number,number>[] => {
+          if( lookBackQuantity <= NUM_POINTS) {
+            const allStockData = stockData[ticker];
+            return allStockData.slice( NUM_POINTS - lookBackQuantity, NUM_POINTS);
+          } else {
+            return stockData[ticker];
+          }
+        }
+        const getMostRecentPurchasePrice = (ticker: string): number => {
+          return stockLastPurchasePrice[ticker];
+        }
 
         marketScriptInstructionSet['getCurrentValue'] = getCurrentValue;
         marketScriptInstructionSet['getWalletBalance'] = getWalletBalance;
         marketScriptInstructionSet['buyStock'] = buyStock;
         marketScriptInstructionSet['sellStock'] = sellStock;
+        marketScriptInstructionSet['getHistoricalValue'] = getHistoricalValue;
+        marketScriptInstructionSet['getMostRecentPurchasePrice'] = getMostRecentPurchasePrice;
 
         const scriptFunction = new Function('MarketScript', editorContent)
         scriptFunction(marketScriptInstructionSet, editorContent)
@@ -185,6 +180,7 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
   const executeScript = () => {
     try {
       setIsRunning(true)
+      readOnly = true;
     } catch (error) {
       console.error('Error executing script:', error)
     }
@@ -192,6 +188,7 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
 
   const pauseScript = () => {
     setIsRunning(false)
+    readOnly = false;
   }
 
   const transferToBank = () => {
@@ -229,6 +226,7 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
           defaultValue={editorContent}
           onChange={handleEditorChange}
           theme="vs-dark"
+          options={{readOnly}}
         />
       </div>
       <ScrollArea className="w-1/2 p-4">
@@ -237,8 +235,9 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
             <Card key={ticker} className="w-full h-64">
               <CardHeader className='flex-row items-center'>
                 <CardTitle>{ticker}</CardTitle>
-                  <h3 className='ml-auto'>Price: ${stockTickerValues[ticker]}</h3>
-                  <h3 className='ml-auto'>Bal: {stockTickerBalances[ticker]}</h3>
+                  <p className='ml-auto'>Price: ${stockTickerValues[ticker]}</p>
+                  <p className='ml-auto'>Bal: {stockTickerBalances[ticker]}</p>
+                  <p className='ml-auto'>Position: {stockLastPurchasePrice[ticker]}</p>
               </CardHeader>
               <CardContent className='w-full h-full'>
                 <ResponsiveContainer width="100%" height={300}>
