@@ -7,13 +7,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { Play, Pause, DollarSignIcon } from 'lucide-react'
+import { 
+  TickerTags
+  , StockTickerValues
+  , StockTickerBalances
+  , StockAveragePurchasePrice
+  , TickerMaxValues
+  , StockData 
+} from './types/global'
 
 // Sample stock tickers
-const stockTickers = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'FB', 'TSLA', 'NVDA', 'NFLX', 'VRY', 'TRBA'];
-const stockTickerValues: Record<string, number> = {};
-const stockTickerBalances: Record<string, number> = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0};
-const stockLastPurchasePrice: Record<string, number> = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0};
-const tickerMaxValues: Record<string, number> = {'AAPL': 250, 'GOOGL': 400, 'MSFT': 300, 'AMZN': 350, 'FB': 150, 'TSLA': 100, 'NVDA': 500, 'NFLX': 300, 'VRY': 300, 'TRBA': 100};
+const stockTickers: TickerTags[] = Object.values( TickerTags );
+const stockTickerValues: StockTickerValues = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0}
+const stockTickerBalances: StockTickerBalances = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0};
+const stockAveragePurchasePrice: StockAveragePurchasePrice = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0};
+const tickerMaxValues: TickerMaxValues = {'AAPL': 250, 'GOOGL': 400, 'MSFT': 300, 'AMZN': 350, 'FB': 150, 'TSLA': 100, 'NVDA': 500, 'NFLX': 300, 'VRY': 300, 'TRBA': 100};
 let readOnly: boolean = false;
 
 let VOLATILITY = 10;
@@ -23,7 +31,7 @@ let time = NUM_POINTS;
 
 // Sample stock data generator
 const generateStockData = (
-  ticker: string
+  ticker: TickerTags
   , numPoints = NUM_POINTS
 ) => {
   let price = Math.round(Math.random() * 50) + 50
@@ -44,6 +52,11 @@ const generateStockData = (
   return arr;
 }
 
+const calculateRollingAverage =( currentAverage: number, currentQuantity:number,  addedQuantity: number, addedPrice: number ): number => {
+  const rawRollingAverage = ( currentAverage * currentQuantity + (addedPrice * addedQuantity)) / ( currentQuantity + addedQuantity );
+  return Math.round(rawRollingAverage * 100) / 100;
+}
+
 export default function MarketScriptGame() {
   // eslint-disable-next-line prefer-const
   let [editorContent, setEditorContent] = useState(
@@ -55,18 +68,18 @@ export default function MarketScriptGame() {
 //  getHistoricalValue( tickerName: string, lookBackQuantity: number): Record<number,number>[]
 //  buyStock( tickerName: string, quantity: number ): boolean
 //  sellStock( tickerName: string, quantity: number ): boolean
-//  getMostRecentPurchasePrice( tickerName: string ): number
+//  getAveragePurchasePrice( tickerName: string ): number
 
 console.log(MarketScript.getCurrentValue('AAPL'));\n`
   );
   const [isRunning, setIsRunning] = useState(false);
-  const [stockData, setStockData] = useState<Record<string, { time: number, price: number }[]>>({});
+  const [stockData, setStockData] = useState<StockData>({ AAPL: [], GOOGL: [], MSFT: [], AMZN: [], FB: [], TSLA: [], NVDA: [], NFLX: [], VRY: [], TRBA: [] });
   const [walletBalance, setWalletBalance] = useState<number>( 1000 );
   // const [bankBalance, setBankBalance] = useState<number>( 3565 );
 
   useEffect(() => {
     // Initialize stock data
-    const initialData: Record<string, { time: number, price: number }[]>  = {}
+    const initialData: StockData  = { AAPL: [], GOOGL: [], MSFT: [], AMZN: [], FB: [], TSLA: [], NVDA: [], NFLX: [], VRY: [], TRBA: [] }
     stockTickers.forEach(ticker => {
       initialData[ticker] = generateStockData(ticker);
     })
@@ -89,9 +102,9 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
         // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
         const marketScriptInstructionSet: Record<string, Function> = {};
                     
-        const getCurrentValue = (ticker: string) => { return stockData[ticker][stockData[ticker].length - 1] };
+        const getCurrentValue = (ticker: TickerTags) => { return stockData[ticker][stockData[ticker].length - 1].price };
         const getWalletBalance = () => { return walletBalance };
-        const buyStock = (ticker: string, quantity: number) => { 
+        const buyStock = (ticker: TickerTags, quantity: number) => { 
           const currentPrice = stockData[ticker][stockData[ticker].length - 1].price;
           const totalCost = currentPrice * quantity;
           if( walletBalance >= totalCost ) {
@@ -100,17 +113,21 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
             return false;
           }
 
-          stockLastPurchasePrice[ticker] = currentPrice;
+          const currentAverage = stockAveragePurchasePrice[ticker];
+          const currentQuantity = stockTickerBalances[ticker];
+
+          stockAveragePurchasePrice[ticker] = calculateRollingAverage( currentAverage, currentQuantity, quantity, currentPrice );
           setWalletBalance( walletBalance - totalCost );
           return true;
         };
-        const sellStock = (ticker: string, quantity: number) => { 
+        const sellStock = (ticker: TickerTags, quantity: number) => { 
           const currentPrice = stockData[ticker][stockData[ticker].length - 1].price;
           const currentQuantity = stockTickerBalances[ticker];
           const totalGain = currentPrice * quantity;
           
           if( currentQuantity >= quantity ) {
             stockTickerBalances[ticker] = currentQuantity - quantity
+            if( stockTickerBalances[ticker] === 0 ) { stockAveragePurchasePrice[ticker] = 0; }
           } else {
             return false;
           }
@@ -118,7 +135,7 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
           setWalletBalance( walletBalance + totalGain );
           return true;
         };
-        const getHistoricalValue = (ticker: string, lookBackQuantity: number): Record<number,number>[] => {
+        const getHistoricalValue = (ticker: TickerTags, lookBackQuantity: number): Record<number,number>[] => {
           if( lookBackQuantity <= NUM_POINTS) {
             const allStockData = stockData[ticker];
             return allStockData.slice( NUM_POINTS - lookBackQuantity, NUM_POINTS);
@@ -126,8 +143,8 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
             return stockData[ticker];
           }
         }
-        const getMostRecentPurchasePrice = (ticker: string): number => {
-          return stockLastPurchasePrice[ticker];
+        const getAveragePurchasePrice = (ticker: TickerTags): number => {
+          return stockAveragePurchasePrice[ticker];
         }
 
         marketScriptInstructionSet['getCurrentValue'] = getCurrentValue;
@@ -135,7 +152,7 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
         marketScriptInstructionSet['buyStock'] = buyStock;
         marketScriptInstructionSet['sellStock'] = sellStock;
         marketScriptInstructionSet['getHistoricalValue'] = getHistoricalValue;
-        marketScriptInstructionSet['getMostRecentPurchasePrice'] = getMostRecentPurchasePrice;
+        marketScriptInstructionSet['getAveragePurchasePrice'] = getAveragePurchasePrice;
 
         const scriptFunction = new Function('MarketScript', editorContent)
         scriptFunction(marketScriptInstructionSet, editorContent)
@@ -145,22 +162,24 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
         */
         setStockData(prevData => {
 
-          const newData: Record<string, { time:number, price:number}[]> = { ...prevData }
+          const newData: StockData = { ...prevData }
           
           Object.keys(newData).forEach(ticker => {
-            const lastPrice = newData[ticker][newData[ticker].length - 1].price;
+            const tickerTag = ticker as TickerTags;
+
+            const lastPrice = newData[tickerTag][newData[tickerTag].length - 1].price;
             let newPrice = Math.round(lastPrice + Math.random() * VOLATILITY - VOLATILITY / 2);
-            const tickerMax = tickerMaxValues[ticker];
+            const tickerMax = tickerMaxValues[tickerTag];
 
             while( newPrice < 0 || newPrice > tickerMax) {
               newPrice = Math.round(lastPrice + Math.random() * VOLATILITY - VOLATILITY / 2);
             }
 
-            stockTickerValues[ticker] = newPrice;
+            stockTickerValues[tickerTag] = newPrice;
             // shift the array an create a new element at the end
-            newData[ticker].shift();
-            newData[ticker] = [
-              ...newData[ticker], { time, price: newPrice }
+            newData[tickerTag].shift();
+            newData[tickerTag] = [
+              ...newData[tickerTag], { time, price: newPrice }
             ]
           })
 
@@ -237,14 +256,14 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
                 <CardTitle>{ticker}</CardTitle>
                   <p className='ml-auto'>Price: ${stockTickerValues[ticker]}</p>
                   <p className='ml-auto'>Bal: {stockTickerBalances[ticker]}</p>
-                  <p className='ml-auto'>Position: {stockLastPurchasePrice[ticker]}</p>
+                  <p className='ml-auto'>Position: {stockAveragePurchasePrice[ticker]}</p>
               </CardHeader>
               <CardContent className='w-full h-full'>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={stockData[ticker as keyof typeof stockData]} height={200} width={300}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="time" />
-                    <YAxis />
+                    <YAxis/>
                     <Tooltip />
                     <Legend />
                     <Line type="monotone" dataKey="price" stroke="#8884d8" />
