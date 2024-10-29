@@ -81,7 +81,7 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
   const [isRunning, setIsRunning] = useState(false);
   const [stockData, setStockData] = useState<Record<string, { time: number, price: number }[]>>({});
   const [walletBalance, setWalletBalance] = useState<number>( 1000 );
-  const [bankBalance, setBankBalance] = useState<number>( 3565 );
+  // const [bankBalance, setBankBalance] = useState<number>( 3565 );
 
   useEffect(() => {
     // Initialize stock data
@@ -176,10 +176,10 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
 
     return () => clearInterval(interval)
 
-  }, [isRunning, editorContent, stockData])
+  }, [isRunning, editorContent, stockData, walletBalance])
 
-  const handleEditorChange = (value: string) => {
-    setEditorContent(value)
+  const handleEditorChange = (value: string | undefined): void => {
+    setEditorContent(value || '');
   }
 
   const executeScript = () => {
@@ -221,7 +221,7 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
         </div>
         <div className="mb-4 flex space-x-2 items-center">
           <h2>Wallet: {walletBalance}</h2>
-          <h2>Bank: {bankBalance}</h2>
+          <h2>Bank: <small>coming soon</small></h2>
         </div>
         <Editor
           height="90%"
