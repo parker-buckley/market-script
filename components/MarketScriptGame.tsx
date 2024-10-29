@@ -117,7 +117,7 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
           const currentQuantity = stockTickerBalances[ticker];
 
           stockAveragePurchasePrice[ticker] = calculateRollingAverage( currentAverage, currentQuantity, quantity, currentPrice );
-          setWalletBalance( walletBalance - totalCost );
+          setWalletBalance( prevBalance => prevBalance - totalCost );
           return true;
         };
         const sellStock = (ticker: TickerTags, quantity: number) => { 
@@ -132,7 +132,7 @@ console.log(MarketScript.getCurrentValue('AAPL'));\n`
             return false;
           }
 
-          setWalletBalance( walletBalance + totalGain );
+          setWalletBalance( prevBalance => prevBalance + totalGain );
           return true;
         };
         const getHistoricalValue = (ticker: TickerTags, lookBackQuantity: number): Record<number,number>[] => {
