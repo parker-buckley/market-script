@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Play, Pause, DollarSignIcon } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
@@ -13,7 +13,8 @@ import { useInterval } from '@/app/hooks/useInterval'
 
 import { 
   TickerTags
-  , StockData
+  , StockData,
+  StockAveragePurchasePrice
 } from './types/global'
 import { 
   calculateRollingAverage
@@ -21,17 +22,16 @@ import {
   , generateStockData 
 } from '../lib/utils'
 import { 
-  EDITOR_REFESH_SPEED
-  , GAME_TIME_LIMIT
+  GAME_TIME_LIMIT
   , MARKET_REFESH_SPEED
   , NUM_POINTS
-  , stockAveragePurchasePrice
   , stockTickerBalances
   , stockTickers
   , stockTickerValues
   , tickerMaxValues
   , tickerVolatilities 
 } from '@/lib/constants'
+import local from 'next/font/local'
 
 let readOnly: boolean = false;
 let time = NUM_POINTS;
@@ -49,6 +49,7 @@ export default function MarketScriptGame() {
     sellStock( tickerName: string, quantity: number ): boolean
     getAveragePurchasePrice( tickerName: string ): number
     getStockBalance( tickerName: string ): number
+    getWalletBalance(): number
 */
 
 const {
@@ -58,15 +59,17 @@ const {
   , sellStock
   , getAveragePurchasePrice
   , getStockBalance
+  , getWalletBalance
 } = MarketScript;
 
-const tickers = ['AAPL','GOOGL','MSFT','AMZN','FB','TSLA','NVDA','NFLX','VRY','TRBA'];
+const tickers = ['AAPL','GOOGL','MSFT','AMZN','FB','TSLA','NVDA','NFLX','VRY'];
 
 console.log(getCurrentValue('AAPL'));`
 );
   const [isEditorRunning, setIsEditorRunning] = useState(false);
   const [isMarketRunning, setIsMarketRunning] = useState(false);
   const [stockData, setStockData] = useState<StockData>({ AAPL: [], GOOGL: [], MSFT: [], AMZN: [], FB: [], TSLA: [], NVDA: [], NFLX: [], VRY: [], TRBA: [] });
+  const [stockAveragePurchasePrice, setStockAveragePurchasePrice] = useState<StockAveragePurchasePrice>({ AAPL: 0, GOOGL: 0, MSFT: 0, AMZN: 0, FB: 0, TSLA: 0, NVDA: 0, NFLX: 0, VRY: 0, TRBA: 0 });
   const [walletBalance, setWalletBalance] = useState<number>( 1000 );
   const [isGameOver, setIsGameOver] = useState<boolean>( false );
   const [isGameStarted, setIsGameStarted] = useState<boolean>( false );
@@ -80,7 +83,27 @@ console.log(getCurrentValue('AAPL'));`
 
     setStockData(initialData);
   }, [])
+
+  const walletBalanceRef = useRef(walletBalance);
+  const stockAveragePurchasePriceRef = useRef(stockAveragePurchasePrice);
+
+  // Keep the refs updated with the latest state on each render
+  useEffect(() => {
+    walletBalanceRef.current = walletBalance;
+  }, [walletBalance]);
+
+  useEffect(() => {
+    stockAveragePurchasePriceRef.current = stockAveragePurchasePrice;
+  }, [stockAveragePurchasePrice]);
   
+
+  const [flashEffect, setFlashEffect] = useState<Record<string, string | null>>({});
+  const flashEffectRef = useRef(flashEffect);
+  useEffect(() => { flashEffectRef.current = flashEffect }, [flashEffect]);
+
+  const gameClockRef = useRef(GAME_CLOCK);
+  useEffect(() => { gameClockRef.current = GAME_CLOCK }, [GAME_CLOCK]);
+
   useInterval(()=>{
     if( isGameStarted ) {
       GAME_CLOCK += MARKET_REFESH_SPEED;
@@ -90,8 +113,8 @@ console.log(getCurrentValue('AAPL'));`
     }
   }, 1000);
 
-  useInterval(() => {
-      if (isMarketRunning) {
+  useInterval(async () => {
+    if (isMarketRunning) {
         time++;
 
         if( time % 30 ) {
@@ -135,49 +158,81 @@ console.log(getCurrentValue('AAPL'));`
           })
           return newData;
         } )
-      } 
-  }, MARKET_REFESH_SPEED);
-
-  useInterval(()=> {
+    }
     if (isEditorRunning) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
       const marketScriptInstructionSet: Record<string, Function> = {};
                   
       const getCurrentValue = (ticker: TickerTags) => { return stockData[ticker][stockData[ticker].length - 1].price };
 
-      const getWalletBalance = () => { return walletBalance };
+      const getWalletBalance = () => { return walletBalanceRef.current };
 
       const buyStock = (ticker: TickerTags, quantity: number) => { 
+        if (ticker === TickerTags.Trba) return true;
+
         const currentPrice = stockData[ticker][stockData[ticker].length - 1].price;
         const totalCost = currentPrice * quantity;
-        if( walletBalance >= totalCost ) {
-          stockTickerBalances[ticker] = stockTickerBalances[ticker] + quantity
-        } else {
-          return false;
+      
+        if (walletBalanceRef.current >= totalCost) {
+          stockTickerBalances[ticker] += quantity;
+          setWalletBalance(prevBalance => {
+            walletBalanceRef.current = prevBalance - totalCost;
+            return walletBalanceRef.current;
+          });
+      
+          const currentAverage = stockAveragePurchasePriceRef.current[ticker];
+          const currentQuantity = stockTickerBalances[ticker];
+          const newAverage = calculateRollingAverage(currentAverage, currentQuantity, quantity, currentPrice);
+      
+          setStockAveragePurchasePrice(prevPrices => {
+            const updatedPrices = { ...prevPrices, [ticker]: newAverage };
+            stockAveragePurchasePriceRef.current = updatedPrices;
+            return updatedPrices;
+          });
+      
+          setFlashEffect((prev) => ({ ...prev, [ticker]: 'red' }));
+
+          setTimeout(() => {
+            setFlashEffect((prev) => ({ ...prev, [ticker]: null }));
+          }, 100);
+
+          return true;
         }
-
-        const currentAverage = stockAveragePurchasePrice[ticker];
-        const currentQuantity = stockTickerBalances[ticker];
-
-        stockAveragePurchasePrice[ticker] = calculateRollingAverage( currentAverage, currentQuantity, quantity, currentPrice );
-        setWalletBalance( prevBalance => prevBalance - totalCost );
-        return true;
-      };
+      
+        return false;
+      }
 
       const sellStock = (ticker: TickerTags, quantity: number) => { 
         const currentPrice = stockData[ticker][stockData[ticker].length - 1].price;
         const currentQuantity = stockTickerBalances[ticker];
         const totalGain = currentPrice * quantity;
-        
-        if( currentQuantity >= quantity ) {
-          stockTickerBalances[ticker] = currentQuantity - quantity
-          if( stockTickerBalances[ticker] === 0 ) { stockAveragePurchasePrice[ticker] = 0; }
-        } else {
-          return false;
-        }
+      
+        if (currentQuantity >= quantity) {
+          stockTickerBalances[ticker] -= quantity;
+      
+          if (stockTickerBalances[ticker] === 0) {
+            setStockAveragePurchasePrice(prevPrices => {
+              const updatedPrices = { ...prevPrices, [ticker]: 0 };
+              stockAveragePurchasePriceRef.current = updatedPrices;
+              return updatedPrices;
+            });
+          }
+      
+          setWalletBalance(prevBalance => {
+            walletBalanceRef.current = prevBalance + totalGain;
+            return walletBalanceRef.current;
+          });
+      
+          setFlashEffect((prev) => ({ ...prev, [ticker]: 'green' }));
 
-        setWalletBalance( prevBalance => prevBalance + totalGain );
-        return true;
+          setTimeout(() => {
+            setFlashEffect((prev) => ({ ...prev, [ticker]: null }));
+          }, 100 );
+
+          return true;
+        }
+      
+        return false;
       };
 
       const getHistoricalValue = (ticker: TickerTags, lookBackQuantity: number): Record<number,number>[] => {
@@ -190,7 +245,7 @@ console.log(getCurrentValue('AAPL'));`
       }
 
       const getAveragePurchasePrice = (ticker: TickerTags): number => {
-        return stockAveragePurchasePrice[ticker];
+        return stockAveragePurchasePriceRef.current[ticker];
       }
 
       const getStockBalance = (ticker: TickerTags): number => { return stockTickerBalances[ticker]; }
@@ -205,9 +260,19 @@ console.log(getCurrentValue('AAPL'));`
 
       const scriptFunction = new Function('MarketScript', editorContent);
 
-      scriptFunction(marketScriptInstructionSet, editorContent);
-    }
-  }, EDITOR_REFESH_SPEED );
+      const scriptPromise = async () => {
+        try {
+          const result = await scriptFunction(marketScriptInstructionSet, editorContent);
+          return result;
+        } catch (error) {
+          console.error('Script execution error:', error);
+        }
+      };
+  
+      await scriptPromise();
+    }  
+  }, MARKET_REFESH_SPEED);
+
 
   const handleEditorChange = (value: string | undefined): void => {
     setEditorContent(value || '');
@@ -224,6 +289,7 @@ console.log(getCurrentValue('AAPL'));`
 
   const pauseScript = () => {
     setIsEditorRunning(false)
+    readOnly = false;
   }
 
   const transferToBank = () => {
@@ -307,11 +373,11 @@ console.log(getCurrentValue('AAPL'));`
           <Button onClick={transferToBank} disabled={isEditorRunning}>
             <DollarSignIcon className="mr-2 h-4 w-4" /> Bank Transfer
           </Button>
+          <h1 className='text-4xl text-right w-full'>{Math.floor((GAME_TIME_LIMIT-gameClockRef.current) / 60000)}m:{(GAME_TIME_LIMIT-gameClockRef.current)%60000 / 1000}s</h1>
         </div>
         <div className="mb-4 flex space-x-2 items-center">
           <h2>Wallet: {walletBalance}</h2>
           <h2>Bank: <small>coming soon</small></h2>
-          <h1>{Math.floor((GAME_TIME_LIMIT-GAME_CLOCK) / 60000)}m:{(GAME_TIME_LIMIT-GAME_CLOCK)%60000 / 1000}s</h1>
         </div>
         <Editor
           height="90%"
@@ -325,7 +391,9 @@ console.log(getCurrentValue('AAPL'));`
       <ScrollArea className="w-1/2 p-4">
         <div className="grid grid-cols-2 gap-4">
           {stockTickers.map(ticker => (
-            <Card key={ticker} className="w-full h-64">
+            <Card key={ticker} className={`w-full h-64 ${
+              flashEffect[ticker] === 'green' ? 'bg-green-200' : flashEffect[ticker] === 'red' ? 'bg-red-200' : 'bg-inherent'
+            } transition-colors duration-300`}>
               <CardHeader className='flex-row items-center'>
                 <CardTitle>{ticker}</CardTitle>
                   <p className='ml-auto'>Price: ${stockTickerValues[ticker]}</p>

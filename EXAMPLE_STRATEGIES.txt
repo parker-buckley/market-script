@@ -1,0 +1,22 @@
+Buying the minimum stock and waiting for return value
+
+let minValue = 10000;
+for( const ticker of tickers ) {
+    if( getCurrentValue(ticker) < minValue ) {
+        minTicker = ticker;
+        minValue = getCurrentValue(ticker);
+    }
+}
+
+if( getWalletBalance() > getCurrentValue(minTicker) ) {
+    buyStock( minTicker, 1 );
+}
+
+for( const ticker of tickers ) {
+    if( 
+        getAveragePurchasePrice(ticker) > 0
+        && getAveragePurchasePrice(ticker) < getCurrentValue(ticker) 
+    ) {
+        sellStock(ticker, 1);
+    }
+}
