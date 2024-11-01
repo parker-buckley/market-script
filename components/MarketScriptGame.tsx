@@ -31,7 +31,6 @@ import {
   , tickerMaxValues
   , tickerVolatilities 
 } from '@/lib/constants'
-import local from 'next/font/local'
 
 let readOnly: boolean = false;
 let time = NUM_POINTS;
