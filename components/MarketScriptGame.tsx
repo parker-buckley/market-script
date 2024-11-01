@@ -2,66 +2,40 @@
 
 import React, { useState, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { Play, Pause, DollarSignIcon } from 'lucide-react'
-import { 
-  TickerTags
-  , StockTickerValues
-  , StockTickerBalances
-  , StockAveragePurchasePrice
-  , TickerMaxValues
-  , StockData 
-} from './types/global'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useInterval } from '@/app/hooks/useInterval'
 
-// Sample stock tickers
-const stockTickers: TickerTags[] = Object.values( TickerTags );
-const stockTickerValues: StockTickerValues = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0}
-const stockTickerBalances: StockTickerBalances = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0};
-const stockAveragePurchasePrice: StockAveragePurchasePrice = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0};
-const tickerMaxValues: TickerMaxValues = {'AAPL': 250, 'GOOGL': 400, 'MSFT': 300, 'AMZN': 350, 'FB': 150, 'TSLA': 100, 'NVDA': 500, 'NFLX': 300, 'VRY': 300, 'TRBA': 100};
+import { 
+  TickerTags
+  , StockData
+} from './types/global'
+import { 
+  calculateRollingAverage
+  , changeVolatility
+  , generateStockData 
+} from '../lib/utils'
+import { 
+  EDITOR_REFESH_SPEED
+  , GAME_TIME_LIMIT
+  , MARKET_REFESH_SPEED
+  , NUM_POINTS
+  , stockAveragePurchasePrice
+  , stockTickerBalances
+  , stockTickers
+  , stockTickerValues
+  , tickerMaxValues
+  , tickerVolatilities 
+} from '@/lib/constants'
+
 let readOnly: boolean = false;
-
-let VOLATILITY = 10;
-const VOLATILITY_MAX = 20;
-const NUM_POINTS = 200;
 let time = NUM_POINTS;
-const MARKET_REFESH_SPEED = 1000;
-const EDITOR_REFESH_SPEED = 1000;
-const GAME_TIME_LIMIT = 5 * 60 * 1000;
 let GAME_CLOCK = 0;
-
-// Sample stock data generator
-const generateStockData = (
-  ticker: TickerTags
-  , numPoints = NUM_POINTS
-) => {
-  let price = Math.round(Math.random() * 50) + 50
-  const arr = [];
-
-  for( let i = 0; i < numPoints; i++ ) {
-    let newPrice = Math.round(price + Math.random() * VOLATILITY - VOLATILITY / 2);
-    const tickerMax = tickerMaxValues[ticker];
-  
-    while( newPrice < 0 || newPrice > tickerMax) {
-      newPrice = Math.round(newPrice + Math.random() * VOLATILITY - VOLATILITY / 2);
-    }
-
-    arr[i] = { time: i, price: newPrice };
-    price = newPrice;
-  }
-
-  return arr;
-}
-
-const calculateRollingAverage =( currentAverage: number, currentQuantity:number,  addedQuantity: number, addedPrice: number ): number => {
-  const rawRollingAverage = ( currentAverage * currentQuantity + (addedPrice * addedQuantity)) / ( currentQuantity + addedQuantity );
-  return Math.round(rawRollingAverage * 100) / 100;
-}
 
 export default function MarketScriptGame() {
   // eslint-disable-next-line prefer-const
@@ -85,9 +59,11 @@ const {
   , getAveragePurchasePrice
   , getStockBalance
 } = MarketScript;
- 
+
+const tickers = ['AAPL','GOOGL','MSFT','AMZN','FB','TSLA','NVDA','NFLX','VRY','TRBA'];
+
 console.log(getCurrentValue('AAPL'));`
-  );
+);
   const [isEditorRunning, setIsEditorRunning] = useState(false);
   const [isMarketRunning, setIsMarketRunning] = useState(false);
   const [stockData, setStockData] = useState<StockData>({ AAPL: [], GOOGL: [], MSFT: [], AMZN: [], FB: [], TSLA: [], NVDA: [], NFLX: [], VRY: [], TRBA: [] });
@@ -106,9 +82,11 @@ console.log(getCurrentValue('AAPL'));`
   }, [])
   
   useInterval(()=>{
-    GAME_CLOCK += 1000;
-    if( GAME_CLOCK >= GAME_TIME_LIMIT ) {
-      triggerEndGame();
+    if( isGameStarted ) {
+      GAME_CLOCK += MARKET_REFESH_SPEED;
+      if( GAME_CLOCK >= GAME_TIME_LIMIT ) {
+        triggerEndGame();
+      }
     }
   }, 1000);
 
@@ -117,7 +95,7 @@ console.log(getCurrentValue('AAPL'));`
         time++;
 
         if( time % 30 ) {
-          VOLATILITY = Math.round( Math.random() * VOLATILITY_MAX )
+          changeVolatility();
         }
 
         setStockData(prevData => {
@@ -126,13 +104,26 @@ console.log(getCurrentValue('AAPL'));`
           
           Object.keys(newData).forEach(ticker => {
             const tickerTag = ticker as TickerTags;
+            const tickerVolatility = tickerVolatilities[tickerTag];
 
             const lastPrice = newData[tickerTag][newData[tickerTag].length - 1].price;
-            let newPrice = Math.round(lastPrice + Math.random() * VOLATILITY - VOLATILITY / 2);
             const tickerMax = tickerMaxValues[tickerTag];
 
-            while( newPrice < 0 || newPrice > tickerMax) {
-              newPrice = Math.round(lastPrice + Math.random() * VOLATILITY - VOLATILITY / 2);
+            let newPrice: number = 0;
+
+            if( ticker === TickerTags.Trba ) {
+              newPrice = Math.round(lastPrice - tickerVolatility / 4);
+  
+              while( newPrice < 0 || newPrice > tickerMax) {
+                if( newPrice <= 0 ) { break; }
+                newPrice = Math.round(lastPrice - tickerVolatility / 4);
+              }
+            } else {
+              newPrice = Math.round(lastPrice + Math.random() * tickerVolatility - tickerVolatility / 2);
+  
+              while( newPrice < 0 || newPrice > tickerMax) {
+                newPrice = Math.round(lastPrice + Math.random() * tickerVolatility - tickerVolatility / 2);
+              }
             }
 
             stockTickerValues[tickerTag] = newPrice;
