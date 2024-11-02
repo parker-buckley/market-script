@@ -12,6 +12,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const calculateRollingAverage =( currentAverage: number, currentQuantity:number,  addedQuantity: number, addedPrice: number ): number => {
+  if ( currentQuantity === 0 || currentAverage === 0 ) { return addedPrice; }
   const rawRollingAverage = ( currentAverage * currentQuantity + (addedPrice * addedQuantity)) / ( currentQuantity + addedQuantity );
   return Math.round(rawRollingAverage * 100) / 100;
 }

@@ -49,6 +49,7 @@ export default function MarketScriptGame() {
     getAveragePurchasePrice( tickerName: string ): number
     getStockBalance( tickerName: string ): number
     getWalletBalance(): number
+    getRemainingTime(): number // this is the number of seconds remaining in the game
 */
 
 const {
@@ -59,6 +60,7 @@ const {
   , getAveragePurchasePrice
   , getStockBalance
   , getWalletBalance
+  , getRemainingTime
 } = MarketScript;
 
 const tickers = ['AAPL','GOOGL','MSFT','AMZN','FB','TSLA','NVDA','NFLX','VRY'];
@@ -249,6 +251,10 @@ console.log(getCurrentValue('AAPL'));`
 
       const getStockBalance = (ticker: TickerTags): number => { return stockTickerBalances[ticker]; }
 
+      const getRemainingTime = (): number => {
+        return ( (GAME_TIME_LIMIT -  gameClockRef.current) / 1000 );
+      }
+
       marketScriptInstructionSet['getCurrentValue'] = getCurrentValue;
       marketScriptInstructionSet['getWalletBalance'] = getWalletBalance;
       marketScriptInstructionSet['buyStock'] = buyStock;
@@ -256,6 +262,7 @@ console.log(getCurrentValue('AAPL'));`
       marketScriptInstructionSet['getHistoricalValue'] = getHistoricalValue;
       marketScriptInstructionSet['getAveragePurchasePrice'] = getAveragePurchasePrice;
       marketScriptInstructionSet['getStockBalance'] = getStockBalance;
+      marketScriptInstructionSet['getRemainingTime'] = getRemainingTime;
 
       const scriptFunction = new Function('MarketScript', editorContent);
 
