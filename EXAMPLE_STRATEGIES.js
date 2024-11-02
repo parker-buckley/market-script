@@ -32,6 +32,12 @@ const transactionQuantity = 1;
             sellStock(ticker, transactionQuantity );
         }
     }
+
+    if( getRemainingTime() === 1 ) {
+        for( const ticker of tickers ) {
+            sellStock( ticker, getStockBalance(ticker));
+        }
+    }
 }
 
 // get the historical average low of each stock and buy if it's within a certain % of minimum
@@ -65,7 +71,7 @@ function percentageBased() {
 
             percentDistanceFromAllTimeLow[ticker] = percentDistance;
 
-            if( percentDistance < 10 ) { countWithinTenPercent++; }
+            if( percentDistance < 0.10 ) { countWithinTenPercent++; }
     }
     
     // is the current value at least a 10% return?
@@ -85,7 +91,7 @@ function percentageBased() {
     const walletBalance = getWalletBalance();
 
     // get the percentage distance from the all time low
-    const allocatedFunds = Math.floor(walletBalance / countWithinTenPercent);
+    const allocatedFunds = Math.floor(walletBalance / tickers.length);
     for( const ticker of tickers ) {
         if( percentDistanceFromAllTimeLow[ticker] < 0.10 ) {
 
@@ -94,6 +100,12 @@ function percentageBased() {
             if( purchaseQuantity > 0 ) {
                 buyStock( ticker, purchaseQuantity );
             }
+        }
+    }
+
+    if( getRemainingTime() === 1 ) {
+        for( const ticker of tickers ) {
+            sellStock( ticker, getStockBalance(ticker));
         }
     }
 }
@@ -128,7 +140,7 @@ function moonShot() {
 
             percentDistanceFromAllTimeLow[ticker] = percentDistance;
 
-            if( percentDistance < 10 ) { countWithinTenPercent++; }
+            if( percentDistance < 0.10 ) { countWithinTenPercent++; }
     }
     
     // is the current value at least a 10% return?
@@ -162,5 +174,83 @@ function moonShot() {
         }
     }
 
-    console.log( getRemainingTime() );
+    // if out of time, sell everything!
+    if( getRemainingTime() === 1 ) {
+        for( const ticker of tickers ) {
+            sellStock( ticker, getStockBalance(ticker));
+        }
+    }
+}
+
+function percentageBasedWithStopLossAndLocalMinimums() { 
+    const tickerAllTimeLow = {};
+    const tickerAllTimeHigh = {};
+    const percentDistanceFromAllTimeLow = {};
+    let countWithinTenPercent = 0;
+    
+    // preprocessing data
+    for( const ticker of tickers ) {
+            // calculate the 30 second local minimum
+            const historicalData = getHistoricalValue(ticker, 60);
+            
+            let absoluteMin = 10000;
+            let absoluteMax = 0;
+            for( const datum of historicalData ) {
+                if( datum.price < absoluteMin ) {
+                    absoluteMin = datum.price;
+                }
+                if( datum.price > absoluteMax ) {
+                    absoluteMax = datum.price
+                }
+            }
+            
+            tickerAllTimeLow[ticker] = absoluteMin;
+            tickerAllTimeHigh[ticker] = absoluteMax;
+            const percentDistance =
+                (getCurrentValue(ticker)  - tickerAllTimeLow[ticker])
+                / (tickerAllTimeHigh[ticker] - tickerAllTimeLow[ticker]);
+
+            percentDistanceFromAllTimeLow[ticker] = percentDistance;
+
+            if( percentDistance < 0.10 ) { countWithinTenPercent++; }
+    }
+    
+    // is there a 10% return
+    // OR 20% loss?
+    // sell it all!
+    for( const ticker of tickers ) {
+        const averagePurchasePrice = getAveragePurchasePrice(ticker);
+        if( averagePurchasePrice <= 0 ) continue;
+        const currentReturnPercentage = (getCurrentValue(ticker) - averagePurchasePrice) / averagePurchasePrice;
+        if( 
+            getAveragePurchasePrice(ticker) > 0
+            && (
+                currentReturnPercentage > 0.10 // profit!
+                || currentReturnPercentage < 0 // stop loss!
+            )
+        ) {
+            sellStock(ticker, getStockBalance(ticker) );
+        }
+    }
+
+    const walletBalance = getWalletBalance();
+
+    // get the percentage distance from the all time low
+    const allocatedFunds = Math.floor(walletBalance / tickers.length);
+    for( const ticker of tickers ) {
+        if( percentDistanceFromAllTimeLow[ticker] < 0.10 ) {
+
+            const purchaseQuantity = Math.floor(allocatedFunds / getCurrentValue(ticker));
+
+            if( purchaseQuantity > 0 ) {
+                buyStock( ticker, purchaseQuantity );
+            }
+        }
+    }
+
+    if( getRemainingTime() === 1 ) {
+        for( const ticker of tickers ) {
+            sellStock( ticker, getStockBalance(ticker));
+        }
+    }
 }

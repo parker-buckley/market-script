@@ -43,7 +43,7 @@ export default function MarketScriptGame() {
 
 /*  Utilize the MarketScript library to interact with the market:
     getCurrentValue( tickerName: string ): number
-    getHistoricalValue( tickerName: string, lookBackQuantity: number): Record<number,number>[]
+    getHistoricalValue( tickerName: string, lookBackQuantity?: number): { time: number, price: number }[]
     buyStock( tickerName: string, quantity: number ): boolean
     sellStock( tickerName: string, quantity: number ): boolean
     getAveragePurchasePrice( tickerName: string ): number
@@ -236,7 +236,10 @@ console.log(getCurrentValue('AAPL'));`
         return false;
       };
 
-      const getHistoricalValue = (ticker: TickerTags, lookBackQuantity: number): Record<number,number>[] => {
+      const getHistoricalValue = (ticker: TickerTags, lookBackQuantity?: number): Record<number,number>[] => {
+        
+        if( !lookBackQuantity ) lookBackQuantity = NUM_POINTS;
+        
         if( lookBackQuantity <= NUM_POINTS) {
           const allStockData = stockData[ticker];
           return allStockData.slice( NUM_POINTS - lookBackQuantity, NUM_POINTS);
