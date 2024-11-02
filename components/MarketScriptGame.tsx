@@ -321,6 +321,20 @@ console.log(getCurrentValue('AAPL'));`
     setIsMarketRunning( currentState => !currentState);
   }
 
+  const triggerRestart = () => {
+    const initialData: StockData  = { AAPL: [], GOOGL: [], MSFT: [], AMZN: [], FB: [], TSLA: [], NVDA: [], NFLX: [], VRY: [], TRBA: [] }
+    stockTickers.forEach(ticker => {
+      initialData[ticker] = generateStockData(ticker);
+    })
+
+    GAME_CLOCK = 0;
+    setWalletBalance(1000);
+    setStockData(initialData);
+    setStockAveragePurchasePrice({ AAPL: 0, GOOGL: 0, MSFT: 0, AMZN: 0, FB: 0, TSLA: 0, NVDA: 0, NFLX: 0, VRY: 0, TRBA: 0 });
+    setIsGameStarted( false );
+    setIsGameOver( false );
+  }
+
   return (
     <div className="flex h-screen bg-background">
       <Dialog open={!isGameStarted}>
@@ -364,7 +378,7 @@ console.log(getCurrentValue('AAPL'));`
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={triggerStartGame}>Start Over</Button>
+            <Button onClick={triggerRestart}>Start Over</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
