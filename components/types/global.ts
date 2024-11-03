@@ -20,3 +20,4 @@ export type TickerRange = Record<TickerTags, number>;
 export type TickerMaxVolatility = Record<TickerTags, number>;
 export type TickerVolatilities = Record<TickerTags, number>;
 export type StockData = Record<TickerTags, { time: number, price: number }[]>;
+export type HighScoreData = { name: string, score: number, date: string }[];

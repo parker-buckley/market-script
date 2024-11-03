@@ -254,3 +254,43 @@ function percentageBasedWithStopLossAndLocalMinimums() {
         }
     }
 }
+
+function chatGPT() {
+    const remainingTime = getRemainingTime();
+
+  tickers.forEach(ticker => {
+    const currentPrice = getCurrentValue(ticker);
+    
+    // Get only the last 10 data points
+    const historicalData = getHistoricalValue(ticker, 10); 
+    if (historicalData.length === 0) return; // Ensure we have data to analyze
+
+    const averagePrice = historicalData.reduce((sum, data) => sum + data.price, 0) / historicalData.length;
+
+    if (getWalletBalance() > currentPrice && currentPrice < averagePrice * buyThreshold) {
+      // Buy if current price is significantly lower than recent average
+      const quantityToBuy = Math.floor(getWalletBalance() / currentPrice);
+      if (quantityToBuy > 0) {
+        buyStock(ticker, quantityToBuy);
+      }
+    }
+
+    const currentStockBalance = getStockBalance(ticker);
+    const averagePurchasePrice = getAveragePurchasePrice(ticker);
+
+    if (currentStockBalance > 0 && currentPrice > averagePurchasePrice * sellThreshold) {
+      // Sell if current price is significantly higher than average purchase price
+      sellStock(ticker, currentStockBalance);
+    }
+  });
+
+  // Ensure all stocks are sold near the end of the game
+  if (remainingTime <= 10) {
+    tickers.forEach(ticker => {
+      const currentStockBalance = getStockBalance(ticker);
+      if (currentStockBalance > 0) {
+        sellStock(ticker, currentStockBalance);
+      }
+    });
+  }
+}

@@ -13,14 +13,17 @@ import { useInterval } from '@/app/hooks/useInterval'
 
 import { 
   TickerTags
-  , StockData,
-  StockAveragePurchasePrice
+  , StockData
+  , StockAveragePurchasePrice
+  , HighScoreData
 } from './types/global'
 import { 
   calculateRollingAverage
   , changeVolatility
   , generateStockData 
 } from '../lib/utils'
+import { RenderHighScores } from './HighScores'
+import { readGist, updateGist } from '@/lib/gist/gist'
 import { 
   GAME_TIME_LIMIT
   , MARKET_REFESH_SPEED
@@ -29,8 +32,10 @@ import {
   , stockTickers
   , stockTickerValues
   , tickerMaxValues
-  , tickerVolatilities 
+  , tickerVolatilities
+  , highScoreData
 } from '@/lib/constants'
+import { Input } from './ui/input'
 
 let readOnly: boolean = false;
 let time = NUM_POINTS;
@@ -74,6 +79,7 @@ console.log(getCurrentValue('AAPL'));`
   const [walletBalance, setWalletBalance] = useState<number>( 1000 );
   const [isGameOver, setIsGameOver] = useState<boolean>( false );
   const [isGameStarted, setIsGameStarted] = useState<boolean>( false );
+  const [playerName, setPlayerName] = useState<string>( '' );
 
   useEffect(() => {
     // Initialize stock data
@@ -105,14 +111,46 @@ console.log(getCurrentValue('AAPL'));`
   const gameClockRef = useRef(GAME_CLOCK);
   useEffect(() => { gameClockRef.current = GAME_CLOCK }, [GAME_CLOCK]);
 
-  useInterval(()=>{
-    if( isGameStarted ) {
+  useInterval(async ()=>{
+    if( isGameStarted && !isGameOver ) {
       GAME_CLOCK += MARKET_REFESH_SPEED;
       if( GAME_CLOCK >= GAME_TIME_LIMIT ) {
-        triggerEndGame();
+        await triggerEndGame();
       }
     }
   }, 1000);
+
+  const resetHighScoreData = async ( name: string, score?: number ) => {
+    
+    let localHighScoreData: HighScoreData = await readGist();
+    if( name && score ) {
+      localHighScoreData.push({ 
+        name
+        , score
+        , date: new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).replace(/\//g, '-')
+      });
+
+      localHighScoreData.sort((a,b) => b.score - a.score);
+      await updateGist(JSON.stringify(localHighScoreData));
+
+      highScoreData.splice(0);
+      for( const datum of localHighScoreData ) {
+        highScoreData.push(datum);
+      }
+    } else {
+      highScoreData.splice(0);
+      localHighScoreData.sort((a,b) => b.score - a.score);
+
+      for( const datum of localHighScoreData ) {
+        highScoreData.push(datum);
+      }
+    }
+
+  }
 
   useInterval(async () => {
     if (isMarketRunning) {
@@ -309,11 +347,12 @@ console.log(getCurrentValue('AAPL'));`
 
   }
 
-  const triggerEndGame = () => {
+  const triggerEndGame = async() => {
+    await resetHighScoreData( playerName, walletBalanceRef.current);
     setIsGameOver( true );
     setIsEditorRunning( false );
     setIsMarketRunning( false );
-    // TODO: Add end game modal, log score
+    
   }
 
   const triggerStartGame = () => {
@@ -342,41 +381,42 @@ console.log(getCurrentValue('AAPL'));`
           <DialogHeader>
             <DialogTitle>MarketScript - Tutorial</DialogTitle>
             <DialogDescription>
-              <br/>Welcome to MarketScript!<br/><br/>
+              <br/>Welcome to MarketScript, the original stock market scripting game!<br/><br/>
               The rules are simple:<br/>
 
-              1. You have 5 minutes to maximize your profit (or lose it all!)<br/>
-              2. You can interact with the MarketScript API with JavaScript<br/>
-              3. Your code will be run every second against the market.<br/>
+              1. Use the MarketScript API to buy, sell, and more!<br/>
+              2. You have 5 minutes to maximize your profit (or lose it all!)<br/>
+              3. Your code will be ran every second<br/>
+              4. Set a high score on the leaderboard!<br/>
               <br/><br/>
               Good Luck!
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-            </div>
-          </div>
           <DialogFooter>
-            <Button onClick={triggerStartGame}>Get Started</Button>
+            <label htmlFor="playerName" className="text-sm font-medium">
+                User Name
+            </label>
+            <Input
+                id="playerName"
+                placeholder="name for hi-score..."
+                className="border rounded-md p-2 focus:outline-none focus:ring focus:ring-blue-500"
+                onChange={( (e) => { setPlayerName(e.target.value) })}
+            />
+            <Button onClick={triggerStartGame} disabled={(playerName === '')}>Get Started</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       <Dialog open={isGameOver}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[600px] h-1/2">
           <DialogHeader>
             <DialogTitle>Game Over!</DialogTitle>
             <DialogDescription>
               You finished with ${walletBalance}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-            </div>
-          </div>
+          <ScrollArea className="w-1/2 p-4">
+              { RenderHighScores( highScoreData ) }
+          </ScrollArea>
           <DialogFooter>
             <Button onClick={triggerRestart}>Start Over</Button>
           </DialogFooter>

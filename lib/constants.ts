@@ -5,8 +5,9 @@ import {
   , TickerRange
   , TickerVolatilities
   , StockTickerValues
+  , HighScoreData
+  , TickerTags
 } from "@/components/types/global"
-import { TickerTags } from "@/components/types/global";
 
 export const stockTickers: TickerTags[] = Object.values( TickerTags );
 export const stockTickerValues: StockTickerValues = {'AAPL': 0, 'GOOGL': 0, 'MSFT': 0, 'AMZN': 0, 'FB': 0, 'TSLA': 0, 'NVDA': 0, 'NFLX': 0, 'VRY': 0, 'TRBA': 0}
@@ -84,3 +85,4 @@ export const NUM_POINTS = 200;
 export const MARKET_REFESH_SPEED = 1000;
 export const EDITOR_REFESH_SPEED = 1000;
 export const GAME_TIME_LIMIT = 5 * 60 * 1000;
+export const highScoreData: HighScoreData = [];
