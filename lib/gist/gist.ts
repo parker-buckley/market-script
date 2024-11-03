@@ -1,7 +1,7 @@
 import { HighScoreData } from "@/components/types/global";
 
 const GITHUB_API_URL = 'https://api.github.com/gists';
-const TOKEN = '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';
+const TOKEN = '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';
 const GIST_KEY = '9f38dd66ab07b524a197798288187e9b'
 
 export async function readGist(): Promise<HighScoreData> {
