@@ -122,7 +122,7 @@ console.log(getCurrentValue('AAPL'));`
 
   const resetHighScoreData = async ( name: string, score?: number ) => {
     
-    let localHighScoreData: HighScoreData = await readGist();
+    const localHighScoreData: HighScoreData = await readGist();
     if( name && score ) {
       localHighScoreData.push({ 
         name
